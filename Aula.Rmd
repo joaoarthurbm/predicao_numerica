@@ -150,10 +150,8 @@ bwplot(results)
 
 
 # Plotar os dois. SVM 'chuta mais valores altos'.
-# newdata = training
-pred = predict(rf)
-#pred = predict(svm_radial, newdata = Boston)
-
+# newdata = training. Para plotar tudo, estou prevendo todos os dados.
+pred = predict(rf, newdata = Boston)
 to_plot = data.frame(pred,Boston$medv)
 ggplot(to_plot, aes(pred, Boston$medv)) + geom_point() + stat_abline()
 ```
