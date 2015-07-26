@@ -1,0 +1,85 @@
+---
+title: "Regressão e Vinho com Caret"
+author: "Nazareno Andrade e João Arthur B. Monteiro"
+date: "26 de julho de 2015"
+output: html_document
+---
+
+```{r}
+require(ggplot2)
+require(caret)
+require(GGally)
+require(dplyr)
+```
+
+Usaremos dados de vinhos: http://www3.dsi.uminho.pt/pcortez/wine/
+
+```{r}
+wines <- read.csv("winequality/winequality-red.csv", sep=";")
+summary(wines)
+
+if(! file.exists("ggpairs.pdf")){
+  pdf("ggpairs.pdf", w = 15, h = 15)
+  ggpairs(wines, alpha=0.3)
+  dev.off()
+}
+
+# do caret:
+featurePlot(wines[,1:11], wines[,12])
+```
+
+Primeiro regressão linear
+
+Em alguns casos é necessário eliminar preditores com alta colinearidade. 
+
+```{r}
+correlationMatrix <- cor(wines[,1:11])
+print(correlationMatrix)
+# find attributes that are highly corrected (ideally >0.75)
+highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.75)
+# print indexes of highly correlated attributes
+print(highlyCorrelated)
+# se houvesse, faríamos: 
+# wines.filtered <- wines[,-highlyCorrelated]
+```
+
+Treino e teste
+
+```{r}
+split<-createDataPartition(y = wines$quality, 
+                           p = 0.7, 
+                           list = FALSE)
+
+wines.dev <- wines[split,]
+wines.val <- wines[-split,]
+```
+
+
+Treinando
+
+```{r}
+ctrl <- trainControl(method = "cv", number = 10)
+
+lmFit <- train(quality ~. , 
+               data = wines.dev, 
+               method = "lm", 
+               trControl = ctrl,
+               metric = "RMSE")
+
+lmFit
+
+summary(lmFit)
+```
+
+Diagnósticos do modelo
+
+```{r}
+plot(varImp(lmFit))
+
+predictedVal <- predict(lmFit, wines.val)
+
+modelvalues<-data.frame(obs = wines.val$quality, pred = predictedVal)
+
+defaultSummary(modelvalues)
+```
+
