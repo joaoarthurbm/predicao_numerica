@@ -9,6 +9,7 @@ output: html_document
 require(ggplot2)
 require(caret)
 require(GGally)
+require(plyr)
 require(dplyr)
 ```
 
@@ -79,24 +80,266 @@ summary(lmFit)
 ```{r}
 plot(varImp(lmFit))
 
-predictedVal <- predict(lmFit, wines.val)
+# Usando os dados de treino!
 
+avaliacao <- data.frame(obs = wines.dev$quality, pred = predict(lmFit), res = resid(lmFit))
+
+ggplot(avaliacao, aes(y = pred, x = obs)) + 
+  geom_point(alpha = 0.5, position = position_jitter(width=0.2)) + 
+  stat_abline(colour = "blue") + 
+  ggtitle("Observado x Previsão (validação)")
+
+ggplot(avaliacao, aes(y = res, x = pred)) + 
+  geom_point(alpha = 0.5, position = position_jitter(width=0.1)) + 
+  geom_abline(slope = 0, intercept = 0, colour = "darkred") + 
+  ggtitle("Resíduos na validação")
+
+# Outra forma de fazer:
+#
+# xyplot(wines.dev$quality ~ predict(lmFit),
+#        ## plot the points (type = 'p') and a background grid ('g')
+#        type = c("p", "g"),
+#        xlab = "Predicted", ylab = "Observed")
+# 
+# xyplot(resid(lmFit) ~ predict(lmFit),
+#        type = c("p", "g"),
+#        xlab = "Predicted", ylab = "Residuals")
+
+
+
+```
+
+Desempenho:
+
+```{r}
+predictedVal <- predict(lmFit, wines.val)
 modelvalues<-data.frame(obs = wines.val$quality, pred = predictedVal)
 
 defaultSummary(modelvalues)
 
 compare <- data.frame(obs = wines.val$quality, pred = predictedVal)
-
 ggplot(compare, aes(y = pred, x = obs)) + 
   geom_point(alpha = 0.5, position = position_jitter(width=0.2)) + 
-  ggtitle("Observado x Previsão")
+  stat_abline() + 
+  ggtitle("Observado x Previsão (validação)")
 
 ggplot(compare, aes(y = (pred - obs), x = obs)) + 
   geom_point(alpha = 0.5, position = position_jitter(width=0.2)) + 
-  ggtitle("Resíduos")
+  ggtitle("Resíduos na validação")
 
 ```
 
 ------
 
+# Outro tipo de regressão
 
+Usaremos MARS
+
+```{r}
+require(earth)
+```
+
+Sem model tuning:
+
+```{r}
+marsSimpleFit <- earth(quality ~ ., data = wine.dev) 
+marsSimpleFit
+summary(marsSimpleFit)
+plotmo(marsSimpleFit)
+```
+
+Agora com caret. Há dois parâmetros para tuning: grau do modelo (quantas variáveis podem interagir em um termo da equação?) e número de termos no modelo final. 
+
+```{r}
+marsGrid <- expand.grid(.degree = 1:2, .nprune = 2:40)
+
+marsFit <- train(quality ~. , 
+                 data = wines.dev, 
+                 method = "earth", 
+                 trControl = ctrl,
+                 # novidade:
+                 tuneGrid = marsGrid,
+                 metric = "RMSE")
+
+marsFit
+```
+
+Diagnóstico
+
+```{r}
+plot(varImp(marsFit))
+
+# Usando os dados de treino!
+avaliacao$modelo <- "RL"
+
+pred_mars <- data.frame(obs = wines.dev$quality, 
+                        pred = predict(marsFit), 
+                        res = wines.dev$quality - predict(marsFit),
+                        modelo = "MARS")
+avaliacao <- rbind(avaliacao, pred_mars)
+
+ggplot(avaliacao, aes(y = pred, x = obs)) + 
+  geom_point(alpha = 0.5, position = position_jitter(width=0.2)) + 
+  stat_abline(colour = "blue") + 
+  facet_grid(. ~ modelo) + 
+  ggtitle("Observado x Previsão (validação)")
+
+ggplot(avaliacao, aes(y = res, x = pred)) + 
+  geom_point(alpha = 0.5, position = position_jitter(width=0.1)) + 
+  geom_abline(slope = 0, intercept = 0, colour = "darkred") + 
+  facet_grid(. ~ modelo) + 
+  ggtitle("Resíduos na validação")
+
+```
+
+O desempenho melhorou?
+
+```{r}
+predictedVal <- predict(marsFit, wines.val)
+modelvalues<-data.frame(obs = wines.val$quality, pred = predictedVal)
+
+defaultSummary(modelvalues)
+
+compare$modelo <- "RL" 
+pred_mars <- data.frame(obs = wines.val$quality, pred = predictedVal, modelo = "MARS")
+compare <- rbind(compare, pred_mars)
+
+ggplot(compare, aes(y = pred, x = obs)) + 
+  geom_point(alpha = 0.5, position = position_jitter(width=0.2)) + 
+  facet_grid(. ~ modelo) + 
+  stat_abline() +
+  ggtitle("Observado x Previsão (validação)")
+
+ggplot(compare, aes(y = (pred - obs), x = obs)) + 
+  geom_point(alpha = 0.5, position = position_jitter(width=0.2)) + 
+  facet_grid(. ~ modelo) + 
+  geom_abline(slope = 0, intercept = 0, colour = "darkred") + 
+  ggtitle("Resíduos na validação")
+
+```
+
+## Bagged MARS 
+
+MARS + Bootstrap AGGregation
+
+```{r}
+bMarsFit <- train(quality ~. , 
+                 data = wines.dev, 
+                 method = "bagEarthGCV", 
+                 trControl = ctrl,
+                 tuneGrid = expand.grid(.degree = 1:2),
+                 metric = "RMSE")
+
+bMarsFit
+
+predictedVal <- predict(bMarsFit, wines.val)
+modelvalues<-data.frame(obs = wines.val$quality, pred = predictedVal)
+
+defaultSummary(modelvalues)
+```
+
+## Boosted LM
+
+```{r}
+bstLsFit <- train(quality ~. , 
+                 data = wines.dev, 
+                 method = "bstLs", 
+                 trControl = ctrl,
+                 metric = "RMSE")
+
+bstLsFit
+summary(bstLsFit)
+
+predictedVal <- predict(bstLsFit, wines.val)
+modelvalues<-data.frame(obs = wines.val$quality, pred = predictedVal)
+
+defaultSummary(modelvalues)
+
+pred_blm <- data.frame(obs = wines.val$quality, pred = predictedVal, modelo = "Boosted LM")
+compare <- rbind(compare, pred_blm)
+
+ggplot(compare, aes(y = pred, x = obs)) + 
+  geom_point(alpha = 0.5, position = position_jitter(width=0.2)) + 
+  facet_grid(. ~ modelo) + 
+  stat_abline() +
+  ggtitle("Observado x Previsão (validação)")
+
+ggplot(compare, aes(y = (pred - obs), x = obs)) + 
+  geom_point(alpha = 0.5, position = position_jitter(width=0.2)) + 
+  facet_grid(. ~ modelo) + 
+  geom_abline(slope = 0, intercept = 0, colour = "darkred") + 
+  ggtitle("Resíduos na validação")
+
+```
+
+
+# kNN 
+
+```{r}
+knnFit <- train(quality ~. , 
+                data = wines.dev, 
+                method = "knn", 
+                trControl = ctrl,
+                preProcess = c("center","scale"), 
+                tuneGrid = expand.grid(.k = 3:6),
+                metric = "RMSE")
+
+knnFit
+
+predictedVal <- predict(knnFit, wines.val)
+modelvalues<-data.frame(obs = wines.val$quality, pred = predictedVal)
+
+defaultSummary(modelvalues)
+
+pred_knn <- data.frame(obs = wines.val$quality, pred = predictedVal, modelo = "kNN")
+compare <- rbind(compare, pred_knn)
+
+ggplot(compare, aes(y = pred, x = obs)) + 
+  geom_point(alpha = 0.5, position = position_jitter(width=0.2)) + 
+  facet_grid(. ~ modelo) + 
+  stat_abline(colour = "darkblue") +
+  #ylim(3, 8) + 
+  ggtitle("Observado x Previsão (validação)")
+
+ggplot(compare, aes(y = (pred - obs), x = obs)) + 
+  geom_point(alpha = 0.5, position = position_jitter(width=0.2)) + 
+  facet_grid(. ~ modelo) + 
+  geom_abline(slope = 0, intercept = 0, colour = "darkred") + 
+  ggtitle("Resíduos na validação")
+
+```
+
+# Cubist
+
+```{r}
+cubFit <- train(quality ~. , 
+                data = wines.dev, 
+                method = "cubist", 
+                trControl = ctrl,
+                metric = "RMSE")
+
+cubFit
+
+predictedVal <- predict(cubFit, wines.val)
+modelvalues<-data.frame(obs = wines.val$quality, pred = predictedVal)
+
+defaultSummary(modelvalues)
+
+pred_cub <- data.frame(obs = wines.val$quality, pred = predictedVal, modelo = "Cubist")
+compare <- rbind(compare, pred_cub)
+
+ggplot(compare, aes(y = pred, x = obs)) + 
+  geom_point(alpha = 0.5, position = position_jitter(width=0.2)) + 
+  facet_grid(. ~ modelo) + 
+  stat_abline(colour = "darkblue") +
+  #ylim(3, 8) + 
+  ggtitle("Observado x Previsão (validação)")
+
+ggplot(compare, aes(y = (pred - obs), x = obs)) + 
+  geom_point(alpha = 0.5, position = position_jitter(width=0.2)) + 
+  facet_grid(. ~ modelo) + 
+  geom_abline(slope = 0, intercept = 0, colour = "darkred") + 
+  ggtitle("Resíduos na validação")
+
+varImp(cubFit)
+```
