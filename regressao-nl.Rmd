@@ -12,6 +12,8 @@ require(GGally)
 require(dplyr)
 ```
 
+# Preliminares
+
 Usaremos dados de vinhos: http://www3.dsi.uminho.pt/pcortez/wine/
 
 ```{r}
@@ -28,21 +30,6 @@ if(! file.exists("ggpairs.pdf")){
 featurePlot(wines[,1:11], wines[,12])
 ```
 
-Primeiro regressão linear
-
-Em alguns casos é necessário eliminar preditores com alta colinearidade. 
-
-```{r}
-correlationMatrix <- cor(wines[,1:11])
-print(correlationMatrix)
-# find attributes that are highly corrected (ideally >0.75)
-highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.75)
-# print indexes of highly correlated attributes
-print(highlyCorrelated)
-# se houvesse, faríamos: 
-# wines.filtered <- wines[,-highlyCorrelated]
-```
-
 Treino e teste
 
 ```{r}
@@ -55,7 +42,23 @@ wines.val <- wines[-split,]
 ```
 
 
-Treinando
+# Regressão linear
+
+Para modelos lineares, é uma boa prática procurar eliminar preditores com alta colinearidade.
+
+
+```{r}
+correlationMatrix <- cor(wines[,1:11])
+print(correlationMatrix)
+# find attributes that are highly corrected (ideally >0.75)
+highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.75)
+# print indexes of highly correlated attributes
+print(highlyCorrelated)
+# se houvesse, faríamos: 
+# wines.filtered <- wines[,-highlyCorrelated]
+```
+
+### Treinando
 
 ```{r}
 ctrl <- trainControl(method = "cv", number = 10)
@@ -71,7 +74,7 @@ lmFit
 summary(lmFit)
 ```
 
-Diagnósticos do modelo
+### Diagnósticos do modelo
 
 ```{r}
 plot(varImp(lmFit))
@@ -81,5 +84,19 @@ predictedVal <- predict(lmFit, wines.val)
 modelvalues<-data.frame(obs = wines.val$quality, pred = predictedVal)
 
 defaultSummary(modelvalues)
+
+compare <- data.frame(obs = wines.val$quality, pred = predictedVal)
+
+ggplot(compare, aes(y = pred, x = obs)) + 
+  geom_point(alpha = 0.5, position = position_jitter(width=0.2)) + 
+  ggtitle("Observado x Previsão")
+
+ggplot(compare, aes(y = (pred - obs), x = obs)) + 
+  geom_point(alpha = 0.5, position = position_jitter(width=0.2)) + 
+  ggtitle("Resíduos")
+
 ```
+
+------
+
 
