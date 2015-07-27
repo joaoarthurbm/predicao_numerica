@@ -45,7 +45,12 @@ wines.val <- wines[-split,]
 
 # Regressão linear
 
-Para modelos lineares, é uma boa prática procurar eliminar preditores com alta colinearidade.
+As pressuposições de regressão para previsão são: 
+- A relação entre preditores e variável de resposta é aproximadamente linear
+- Nenhum preditor pode ser derivado por combinação linear dos demais
+- Há um número igual ou maior de observações do que preditores
+
+Preditores com muita correlação entre si (aka colinearidade) também geram instabilidade no modelo. Para eliminar preditores com alta colinearidade:
 
 
 ```{r}
@@ -59,7 +64,13 @@ print(highlyCorrelated)
 # wines.filtered <- wines[,-highlyCorrelated]
 ```
 
+Caso haja relações não-lineares entre preditores e resposta, podemos adicionar preditores transformados como fatores extra. 
+
+Outro ponto importante: outliers influenciam muito a regressão linear. (Por causa do algoritmo de mínimos quadrados.)
+
 ### Treinando
+
+Não há parâmetro para ajustar na regressão linear simples.
 
 ```{r}
 ctrl <- trainControl(method = "cv", number = 10)
@@ -142,7 +153,7 @@ require(earth)
 Sem model tuning:
 
 ```{r}
-marsSimpleFit <- earth(quality ~ ., data = wine.dev) 
+marsSimpleFit <- earth(quality ~ ., data = wines.dev) 
 marsSimpleFit
 summary(marsSimpleFit)
 plotmo(marsSimpleFit)
@@ -341,5 +352,19 @@ ggplot(compare, aes(y = (pred - obs), x = obs)) +
   geom_abline(slope = 0, intercept = 0, colour = "darkred") + 
   ggtitle("Resíduos na validação")
 
-varImp(cubFit)
+plot(varImp(cubFit))
 ```
+
+-----------
+
+# Conselho de metodologia
+
+Do livro de Kuhn (o autor do caret):
+
+1. Start with several models that are the least interpretable and most flexible, such as boosted trees or support vector machines. Across many problem domains, these models have a high likelihood of producing the empirically optimum results (i.e., most accurate).
+
+2. Investigate simpler models that are less opaque (e.g., not complete black boxes), such as multivariate adaptive regression splines (MARS), partial least squares, generalized additive models, or na ̈ıve Bayes models.
+
+3. Consider using the simplest model that reasonably approximates the per- formance of the more complex methods.
+
+Using this methodology, the modeler can discover the “performance ceiling” for the data set before settling on a model. In many cases, a range of models will be equivalent in terms of performance so the practitioner can weight the benefits of different methodologies (e.g., computational complexity, easy of prediction, interpretability). For example, a nonlinear support vector machine or random forest model might have superior accuracy, but the complexity and scope of the prediction equation may prohibit exporting the prediction equation to a production system. However, if a more interpretable model, such as a MARS model, yielded similar accuracy, the implementation of the prediction equation would be trivial and would also have superior execution time.
