@@ -23,7 +23,6 @@ Usaremos dados de vinhos: (http://www3.dsi.uminho.pt/pcortez/wine/)
 ```{r }
 wines <- read.csv("winequality/winequality-red.csv", sep=";")
 summary(wines)
-featurePlot(wines[,1:11], wines[,12])
 ```
 
 
@@ -88,11 +87,6 @@ Model Trees: ao invés da média, as folhas possuem um modelo.
 
 ![Regression Trees - SSE](modeltrees.png)
 
-
-## SVM
-
-Também podemos utilizar SVM para regressão.
-
 ## Exemplos no caret
 
 'The prediction variance for the ensemble of trees will be less than the variance of predictions from individual trees.'
@@ -104,7 +98,7 @@ mtry é o 'tunning parameter': número de preditores escolhidos. Recomenda-se 1/
 [Muitos modelos aqui.](http://topepo.github.io/caret/Tree_Based_Model.html)
 
 Single Tree
-```{r}
+```{r warning=FALSE}
 stree = m5 <- train(quality ~ ., data = training,
               method = 'ctree',
               trControl = fitControl)
@@ -116,7 +110,7 @@ plot(varImp(stree))
 ```
 
 Model Tree
-```{r}
+```{r warning=FALSE}
 m5 <- train(quality ~ ., data = training,
   method = 'M5',
   trControl = fitControl)
@@ -128,7 +122,7 @@ plot(varImp(m5))
 
 
 Bagged Tree
-```{r}
+```{r warning=FALSE}
 treebag <- train(quality ~ ., data = training,
   method = 'treebag',
   trControl = fitControl)
@@ -138,7 +132,7 @@ plot(varImp(treebag))
 ```
 
 Random Forest
-```{r}
+```{r warning=FALSE}
 # ctry e ntrees: tunning parameters
 rf <- train(quality ~ ., data = training,
   method = "cforest",
@@ -150,7 +144,7 @@ plot(varImp(rf))
 
 
 Comparando técnicas baseadas em árvores...
-```{r}
+```{r warning=FALSE}
 results <- resamples(list(simple = stree, mfive = m5, randomf = rf, treebag = treebag))
 bwplot(results)
 ```
@@ -162,7 +156,7 @@ SVM (minimiza o efeito de outliers)
 Threshold set by the user (denoted as e).
 
 'If the values are unknown, they can be estimated through resampling. In train, the method values of "svmRadial", "svmLinear", or "svmPoly" fit different kernels.'
-```{r}
+```{r warning=FALSE}
 svmRTuned <- train(quality ~ ., data = training,
                     method = "svmRadial",
                     preProc = c("center", "scale"),
@@ -173,4 +167,3 @@ svmRTuned
 plot(svmRTuned)
 plot(varImp(svmRTuned))
 ```
-
